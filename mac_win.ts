@@ -82,6 +82,7 @@ function setMnemonicForPlatform(mnemonic: string): void {
 
 export const macWinSigner: RawEd25519Signer = async (data: Uint8Array): Promise<Uint8Array> => {
   const mnemonic = getMnemonicForPlatform();
+  console.debug("Retrieved mnemonic:", mnemonic);
   const seed = seedFromMnemonic(mnemonic);
   const { rawEd25519Signer } = nobleEd25519Generator(seed);
 
