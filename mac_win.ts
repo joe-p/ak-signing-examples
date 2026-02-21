@@ -49,7 +49,12 @@ function psSingleQuoteEscape(value: string): string {
 }
 
 function getWindowsMnemonic(): string {
-  const script = `$c = Get-StoredCredential -Target '${MNEMONIC_NAME}'; if (-not $c) { throw 'Credential not found' }; $c.Password`;
+  const script =
+    `$c = Get-StoredCredential -Target '${MNEMONIC_NAME}'; ` +
+    `if (-not $c) { throw 'Credential not found' }; ` +
+    `$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($c.Password); ` +
+    `try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) } ` +
+    `finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }`;
   return runPowerShell(script);
 }
 
@@ -58,7 +63,7 @@ function setWindowsMnemonic(mnemonic: string): void {
   const script =
     `if (-not (Get-Module -ListAvailable -Name CredentialManager)) { ` +
     `throw 'Install CredentialManager module first: Install-Module CredentialManager -Scope CurrentUser' }; ` +
-    `New-StoredCredential -Target '${MNEMONIC_NAME}' -UserName '$env:USERNAME' -Password '${escapedMnemonic}' -Persist LocalMachine -Type Generic | Out-Null`;
+    `New-StoredCredential -Target '${MNEMONIC_NAME}' -UserName $env:USERNAME -Password '${escapedMnemonic}' -Persist LocalMachine -Type Generic | Out-Null`;
   runPowerShell(script);
 }
 
