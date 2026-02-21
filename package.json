@@ -1,0 +1,17 @@
+{
+  "name": "ak_signing_examples",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@algorandfoundation/algokit-utils": "v10.0.0-alpha.39",
+    "@bitwarden/sdk-napi": "^1.0.0",
+    "@bitwarden/sdk-wasm": "^0.1.0"
+  }
+}
