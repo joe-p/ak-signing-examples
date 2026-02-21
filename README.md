@@ -1,15 +1,5 @@
-# ak_signing_examples
-
-To install dependencies:
+On Windows [CredentialManager](https://www.powershellgallery.com/packages/CredentialManager/2.0) needs to be installed:
 
 ```bash
-bun install
+Install-Module -Name CredentialManager
 ```
-
-To run:
-
-```bash
-bun run index.ts
-```
-
-This project was created using `bun init` in bun v1.3.3. [Bun](https://bun.com) is a fast all-in-one JavaScript runtime.
