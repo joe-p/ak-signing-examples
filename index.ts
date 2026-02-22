@@ -4,12 +4,14 @@ import {
   nobleEd25519Verifier,
   RawEd25519Signer,
 } from "@algorandfoundation/algokit-utils/crypto";
+import { getLinuxMnemonic, setLinuxMnemonic } from "./linux";
 import { getMacMnemonic, setMacMnemonic } from "./mac";
 import { getWindowsMnemonic, setWindowsMnemonic } from "./win";
 import { generateAddressWithSigners } from "@algorandfoundation/algokit-utils/transact";
 
 function getMnemonicForPlatform(name: string): string {
   if (process.platform === "darwin") return getMacMnemonic(name);
+  if (process.platform === "linux") return getLinuxMnemonic(name);
   if (process.platform === "win32") return getWindowsMnemonic(name);
   throw new Error(`Unsupported platform: ${process.platform}`);
 }
@@ -17,6 +19,10 @@ function getMnemonicForPlatform(name: string): string {
 function setMnemonicForPlatform(name: string, mnemonic: string): void {
   if (process.platform === "darwin") {
     setMacMnemonic(name, mnemonic);
+    return;
+  }
+  if (process.platform === "linux") {
+    setLinuxMnemonic(name, mnemonic);
     return;
   }
   if (process.platform === "win32") {
