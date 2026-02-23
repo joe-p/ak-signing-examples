@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@algorandfoundation/algokit-utils": "v10.0.0-alpha.39",
+    "@aws-sdk/client-kms": "^3.995.0",
     "@bitwarden/sdk-napi": "^1.0.0",
     "@bitwarden/sdk-wasm": "^0.1.0"
   }
