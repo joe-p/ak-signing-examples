@@ -16,7 +16,7 @@ security add-generic-password \
   -U
 ```
 
-Then to load it programatically
+Then to load it programmatically
 
 ```ts
 function run(cmd: string, args: string[]): string {
@@ -72,7 +72,7 @@ Then, to add a mnemonic to your keychain:
 New-StoredCredential -Target 'algorand-mainnet-mnemonic' -UserName $env:USERNAME -Password 'your 25 word mnemonic goes here' -Persist LocalMachine -Type Generic | Out-Null
 ```
 
-Then to load it programatically:
+Then to load it programmatically:
 
 ```ts
 function run(cmd: string, args: string[]): string {
@@ -137,7 +137,7 @@ To add your mnemonic to the keychain:
 "your 25 word mnemonic goes here" | secret-tool store --label "Algorand mnemonic (mainnet)" service algorand account mainnet-mnemonic
 ```
 
-Then to load it programatically:
+Then to load it programmatically:
 
 ```ts
 function run(cmd: string, args: string[], input?: string): string {
@@ -179,9 +179,9 @@ const addrWithSigners = generateAddressWithSigners({ rawEd25519Signer, ed25519Pu
 
 ### KMS with OIDC
 
-The best practice for performing signing opertions in CI is to use an external KMS and authenticate with OIDC. For guides for setting up OIDC, refer to the [GitHub documentation](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments).
+The best practice for performing signing operations in CI is to use an external KMS and authenticate with OIDC. For guides for setting up OIDC, refer to the [GitHub documentation](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments).
 
-Using the KMS, you can retreive the public key and implement `RawEd25519Signer` signer which can then be used to generate an Algorand address and all Algorand-specific signing functions. For example, with AWS:
+Using the KMS, you can retrieve the public key and implement `RawEd25519Signer` signer which can then be used to generate an Algorand address and all Algorand-specific signing functions. For example, with AWS:
 
 TODO: Test this
 
@@ -213,7 +213,7 @@ const addrWithSigners = generateAddressWithSigners({ rawEd25519Signer: signer, e
 
 # Sharing Secrets and Multisig
 
-It's common for a application to have multiple developers that can deploy changes to mainnet. It may be tempting to share a secret for a single account (manually or through a secrets manager), but this is **not recommended**. Instead, it is recommended to setup a multisig account between all of the developers. The multisig account can be a 1/N threshold, which would still allow a single developer to make changes. The benefit of a multisig is that secrets do not need to be shared and all actions are immutably auditable on-chain. Each developer should then follow the practices outlined above.
+It's common for a application to have multiple developers that can deploy changes to mainnet. It may be tempting to share a secret for a single account (manually or through a secrets manager), but this is **not recommended**. Instead, it is recommended to setup a multisig account between all the developers. The multisig account can be a 1/N threshold, which would still allow a single developer to make changes. The benefit of a multisig is that secrets do not need to be shared and all actions are immutably auditable on-chain. Each developer should then follow the practices outlined above.
 
 ```ts
 const addrWithSigners = generateAddressWithSigners({ rawEd25519Signer: signer, ed25519Pubkey: pubkey });
