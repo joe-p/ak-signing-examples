@@ -10,7 +10,7 @@ import { KMSClient, SignCommand, GetPublicKeyCommand } from "@aws-sdk/client-kms
 // - AWS_SECRET_ACCESS_KEY
 const kms = new KMSClient({ region: process.env.AWS_REGION });
 
-const originalSigner: RawEd25519Signer = async (data: Uint8Array): Promise<Uint8Array> => {
+const rawEd25519Signer: RawEd25519Signer = async (data: Uint8Array): Promise<Uint8Array> => {
   const resp = await kms.send(
     new SignCommand({
       KeyId: process.env.KEY_ID,
@@ -48,7 +48,7 @@ if (!spki.subarray(0, 12).equals(ed25519SpkiPrefix)) {
 
 const ed25519Pubkey = spki.subarray(12); // 32 bytes
 
-const addrWithSigner = generateAddressWithSigners({ rawEd25519Signer: originalSigner, ed25519Pubkey });
+const addrWithSigner = generateAddressWithSigners({ rawEd25519Signer, ed25519Pubkey });
 
 const algorand = AlgorandClient.defaultLocalNet();
 

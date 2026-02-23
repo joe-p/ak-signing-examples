@@ -183,11 +183,10 @@ The best practice for performing signing operations in CI is to use an external 
 
 Using the KMS, you can retrieve the public key and implement `RawEd25519Signer` signer which can then be used to generate an Algorand address and all Algorand-specific signing functions. For example, with AWS:
 
-TODO: Test this
-
 ```ts
+const kms = new KMSClient({ region: process.env.AWS_REGION });
 
-const signer: RawEd25519Signer = async (data: Uint8Array): Promise<Uint8Array> => {
+const rawEd25519Signer: RawEd25519Signer = async (data: Uint8Array): Promise<Uint8Array> => {
   const resp = await kms.send(
     new SignCommand({
       KeyId: process.env.KEY_ID,
@@ -197,18 +196,35 @@ const signer: RawEd25519Signer = async (data: Uint8Array): Promise<Uint8Array> =
     })
   );
 
+  if (!resp.Signature) {
+    throw new Error("No signature returned from KMS");
+  }
+
   return resp.Signature;
 }
 
-const pubkeyResp = await kms.send(
-  new GetPublicKeyCommand({
-    KeyId: process.env.KEY_ID,
-  })
-);
+const pubkeyResp = await kms.send(new GetPublicKeyCommand({
+  KeyId: process.env.KEY_ID,
+}));
 
-const pubkey = pubkeyResp.PublicKey;
+if (!pubkeyResp.PublicKey) {
+  throw new Error("No public key returned from KMS");
+}
 
-const addrWithSigners = generateAddressWithSigners({ rawEd25519Signer: signer, ed25519Pubkey: pubkey });
+const spki = Buffer.from(pubkeyResp.PublicKey as Uint8Array);
+
+
+const ed25519SpkiPrefix = Buffer.from([
+  0x30, 0x2a, 0x30, 0x05, 0x06, 0x03, 0x2b, 0x65, 0x70, 0x03, 0x21, 0x00
+]);
+
+if (!spki.subarray(0, 12).equals(ed25519SpkiPrefix)) {
+  throw new Error("Unexpected public key format");
+}
+
+const ed25519Pubkey = spki.subarray(12); // 32 bytes
+
+const addrWithSigner = generateAddressWithSigners({ rawEd25519Signer, ed25519Pubkey });
 ```
 
 # Sharing Secrets and Multisig
