@@ -1,10 +1,18 @@
-# Using Mainnet Secrets
+# Siging Securely
 
-## Using Secrets From a Local Machine
+In general, there are three levels of security when it comes to signing transactions with secret material:
 
-If you are using a mainnet account via secrets on a local machine it is recommended to store the secret material in your OS keychain and only load the secret material when signing. **Writing secret material in plaintext to your environment (i.e. in a .env) is not recommended.** Doing so may lead to accidental leakage through commits. It will also keep the secret in memory throughout the entirety of program execution, which may give a malicious program or dependency the ability to extract secret material.
+1. KMS - The secret material is never exposed to the application
+1. Key Wrapping and Unwrapping - The secret material is stored outside of the app (i.e. keychain) and only loaded in memory when signing
+1. Plaintext - The secret material is stored in plaintext (i.e. in the environment) and is accessible throughout the runtime of the application
 
-### Using Keyring
+While using plaintext environment variables may be the easier to setup, it is **not recommended** for production use. A compromised environment and/or dependency could lead to the secret material being compromised. Additionally, it is easy to accidentally leak secrets in plaintext through git commits.
+
+The most secure option is to use an external KMS that completely isolates the secret material from the application. KMS', however, can have a high setup cost which may be difficult for a solo developer or small team to manage properly. In this case, the next recommended option is to use key wrapping and unwrapping with a secrets manager. This allows the secret material to be stored securely outside of the application and only loaded in memory when signing is necessary. For example, on a local machine, the OS keyring can be used to store the secret material and only load it when signing transactions.
+
+## Signing with a Wrapped Secret
+
+### Using Keyring Secrets
 
 To read a mnemonic from the OS keyring, you can use the `@napi-rs/keyring` library.
 
@@ -69,11 +77,13 @@ const pay = await AlgorandClient.defaultLocalNet().send.payment({
 })
 ```
 
-## Secrets From CI
+## Siging with a KMS
 
-### KMS with OIDC
+### Note on KMS Authentication in CI
 
-The best practice for performing signing operations in CI is to use an external KMS and authenticate with OIDC. For guides for setting up OIDC, refer to the [GitHub documentation](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments).
+If you are using a KMS in CI, the best practice for performing signing operations OIDC. For guides for setting up OIDC, refer to the [GitHub documentation](https://docs.github.com/en/actions/how-tos/secure-your-work/security-harden-deployments).
+
+### Signing with AWS KMS
 
 Using the KMS, you can retrieve the public key and implement `RawEd25519Signer` signer which can then be used to generate an Algorand address and all Algorand-specific signing functions. For example, with AWS:
 
