@@ -1,41 +1,34 @@
+import { algo, AlgorandClient, microAlgo } from "@algorandfoundation/algokit-utils";
 import { mnemonicFromSeed, seedFromMnemonic } from "@algorandfoundation/algokit-utils/algo25";
 import {
   nobleEd25519Generator,
   nobleEd25519Verifier,
   RawEd25519Signer,
 } from "@algorandfoundation/algokit-utils/crypto";
-import { getLinuxMnemonic, setLinuxMnemonic } from "./linux";
-import { getMacMnemonic, setMacMnemonic } from "./mac";
-import { getWindowsMnemonic, setWindowsMnemonic } from "./win";
 import { generateAddressWithSigners } from "@algorandfoundation/algokit-utils/transact";
+import { Entry } from "@napi-rs/keyring";
 
-function getMnemonicForPlatform(name: string): string {
-  if (process.platform === "darwin") return getMacMnemonic(name);
-  if (process.platform === "linux") return getLinuxMnemonic(name);
-  if (process.platform === "win32") return getWindowsMnemonic(name);
-  throw new Error(`Unsupported platform: ${process.platform}`);
+function getMnemonic(name: string): string {
+  const entry = new Entry('algorand', name)
+  const mn = entry.getPassword()
+
+  if (!mn) {
+    throw new Error(`No mnemonic found in keyring for ${name}`);
+  }
+
+  return mn;
 }
 
-function setMnemonicForPlatform(name: string, mnemonic: string): void {
-  if (process.platform === "darwin") {
-    setMacMnemonic(name, mnemonic);
-    return;
-  }
-  if (process.platform === "linux") {
-    setLinuxMnemonic(name, mnemonic);
-    return;
-  }
-  if (process.platform === "win32") {
-    setWindowsMnemonic(name, mnemonic);
-    return;
-  }
-  throw new Error(`Unsupported platform: ${process.platform}`);
+function setMnemonic(name: string, mnemonic: string): void {
+  const entry = new Entry('algorand', name)
+  entry.setPassword(mnemonic)
 }
+
 
 const MNEMONIC_NAME = "algorand-mainnet-mnemonic";
 
 export const rawEd25519Signer: RawEd25519Signer = async (data: Uint8Array): Promise<Uint8Array> => {
-  const mnemonic = getMnemonicForPlatform(MNEMONIC_NAME);
+  const mnemonic = getMnemonic(MNEMONIC_NAME);
   const seed = seedFromMnemonic(mnemonic);
   const { rawEd25519Signer } = nobleEd25519Generator(seed);
 
@@ -45,8 +38,9 @@ export const rawEd25519Signer: RawEd25519Signer = async (data: Uint8Array): Prom
   return sig;
 };
 
+
 export const getPubkey = (): Uint8Array => {
-  const mnemonic = getMnemonicForPlatform(MNEMONIC_NAME);
+  const mnemonic = getMnemonic(MNEMONIC_NAME);
   const seed = seedFromMnemonic(mnemonic);
   const { ed25519Pubkey } = nobleEd25519Generator(seed);
   seed.fill(0);
@@ -54,14 +48,13 @@ export const getPubkey = (): Uint8Array => {
   return ed25519Pubkey;
 }
 
-const algorandAccount = generateAddressWithSigners({ rawEd25519Signer, ed25519Pubkey: getPubkey() });
 
 // Demo
 const seed = crypto.getRandomValues(new Uint8Array(32));
 const mnemonic = mnemonicFromSeed(seed);
 const acct = nobleEd25519Generator(seed);
 
-setMnemonicForPlatform(MNEMONIC_NAME, mnemonic);
+setMnemonic(MNEMONIC_NAME, mnemonic);
 
 const data = new Uint8Array([1, 2, 3]);
 const sig = await rawEd25519Signer(data);
@@ -73,3 +66,23 @@ if (!isValid) {
 }
 
 console.log("Signature valid?", isValid);
+
+const algorandAccount = generateAddressWithSigners({ rawEd25519Signer, ed25519Pubkey: getPubkey() });
+
+const algorand = AlgorandClient.defaultLocalNet();
+
+await algorand.account.ensureFundedFromEnvironment(algorandAccount.addr, algo(1))
+
+// FIXME: No signer found when algorandAccount is sender without explicit signer
+// FIXME: Logs show Sending 0 µALGO from [object Object] to [object Object] via transaction UKEP7PS5G7YAX22ECEQZAOFGHKZZOAMJ3SMJ3VC3UYCJVTRQIN4A
+const pay = await AlgorandClient.defaultLocalNet().send.payment({
+  sender: algorandAccount,
+  signer: algorandAccount,
+  receiver: algorandAccount,
+  amount: microAlgo(0),
+})
+
+if (!pay.confirmation.confirmedRound) {
+  console.error("Payment failed");
+  process.exit(1);
+}

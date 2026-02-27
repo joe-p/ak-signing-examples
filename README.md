@@ -4,39 +4,32 @@
 
 If you are using a mainnet account via secrets on a local machine it is recommended to store the secret material in your OS keychain and only load the secret material when signing. **Writing secret material in plaintext to your environment (i.e. in a .env) is not recommended.** Doing so may lead to accidental leakage through commits. It will also keep the secret in memory throughout the entirety of program execution, which may give a malicious program or dependency the ability to extract secret material.
 
-### MacOS Keyring
+### Using Keyring
 
-To add a mnemonic to your keychain:
-
-```bash
-security add-generic-password \
-  -a "$USER" \
-  -s "algorand-mainnet-mnemonic" \
-  -w "your 25 word mnemonic goes here" \
-  -U
-```
-
-Then to load it programmatically
+To read a mnemonic from the OS keyring, you can use the `@napi-rs/keyring` library.
 
 ```ts
-function run(cmd: string, args: string[]): string {
-  return execFileSync(cmd, args, { encoding: "utf-8" }).trim();
-}
+import { Entry } from "@napi-rs/keyring";
 
-export function getMacMnemonic(name: string): string {
-  const user = process.env.USER ?? "";
-  if (!user) throw new Error("USER is not set");
-  return run("security", ["find-generic-password", "-a", user, "-s", name, "-w"]);
+function getMnemonic(name: string): string {
+  const entry = new Entry('algorand', name)
+  const mn = entry.getPassword()
+
+  if (!mn) {
+    throw new Error(`No mnemonic found in keyring for ${name}`);
+  }
+
+  return mn;
 }
 ```
 
-And turn it into a Algorand address with all signing functions:
+Once you have a way to access the mnemonic, you can implement a `RawEd25519Signer` that retrieves the mnemonic from the keyring and uses it to sign messages.
 
 ```ts
 const MNEMONIC_NAME = "algorand-mainnet-mnemonic";
 
 export const rawEd25519Signer: RawEd25519Signer = async (data: Uint8Array): Promise<Uint8Array> => {
-  const mnemonic = getMacMnemonic(MNEMONIC_NAME);
+  const mnemonic = getMnemonic(MNEMONIC_NAME);
   const seed = seedFromMnemonic(mnemonic);
   const { rawEd25519Signer } = nobleEd25519Generator(seed);
 
@@ -46,133 +39,34 @@ export const rawEd25519Signer: RawEd25519Signer = async (data: Uint8Array): Prom
   return sig;
 };
 
+
 export const getPubkey = (): Uint8Array => {
-  const mnemonic = getMacMnemonic(MNEMONIC_NAME);
+  const mnemonic = getMnemonic(MNEMONIC_NAME);
   const seed = seedFromMnemonic(mnemonic);
   const { ed25519Pubkey } = nobleEd25519Generator(seed);
   seed.fill(0);
 
   return ed25519Pubkey;
 }
-
-const addrWithSigners = generateAddressWithSigners({ rawEd25519Signer, ed25519Pubkey: getPubkey() });
 ```
 
-### Windows Keyring
-
-First, you may need to install [CredentialManager](https://www.powershellgallery.com/packages/CredentialManager/2.0):
-
-```powershell
-Install-Module -Name CredentialManager
-```
-
-Then, to add a mnemonic to your keychain:
-
-```powershell
-New-StoredCredential -Target 'algorand-mainnet-mnemonic' -UserName $env:USERNAME -Password 'your 25 word mnemonic goes here' -Persist LocalMachine -Type Generic | Out-Null
-```
-
-Then to load it programmatically:
+Now with the signer you can use `generateAddressWithSigners` to generate an Algorand address and all Algorand-specific signing functions.
 
 ```ts
-function run(cmd: string, args: string[]): string {
-  return execFileSync(cmd, args, { encoding: "utf-8" }).trim();
-}
+const algorandAccount = generateAddressWithSigners({ rawEd25519Signer, ed25519Pubkey: getPubkey() });
 
-function runPowerShell(command: string): string {
-  return run("powershell", [
-    "-NoProfile",
-    "-NonInteractive",
-    "-ExecutionPolicy",
-    "Bypass",
-    "-Command",
-    command,
-  ]);
-}
+const algorand = AlgorandClient.defaultLocalNet();
 
-export function getWindowsMnemonic(name: string): string {
-  const script =
-    `$c = Get-StoredCredential -Target '${name}'; ` +
-    `if (-not $c) { throw 'Credential not found' }; ` +
-    `$bstr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($c.Password); ` +
-    `try { [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) } ` +
-    `finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) }`;
-  return runPowerShell(script);
-}
-```
+await algorand.account.ensureFundedFromEnvironment(algorandAccount.addr, algo(1))
 
-And finally turn it into an Algorand address with all signing functions:
-
-```ts
-export const rawEd25519Signer: RawEd25519Signer = async (data: Uint8Array): Promise<Uint8Array> => {
-  const mnemonic = getWindowsMnemonic(MNEMONIC_NAME);
-  const seed = seedFromMnemonic(mnemonic);
-  const { rawEd25519Signer } = nobleEd25519Generator(seed);
-
-  const sig = await rawEd25519Signer(data);
-  seed.fill(0);
-
-  return sig;
-};
-
-export const getPubkey = (): Uint8Array => {
-  const mnemonic = getWindowsMnemonic(MNEMONIC_NAME);
-  const seed = seedFromMnemonic(mnemonic);
-  const { ed25519Pubkey } = nobleEd25519Generator(seed);
-  seed.fill(0);
-
-  return ed25519Pubkey;
-}
-
-const addrWithSigners = generateAddressWithSigners({ rawEd25519Signer, ed25519Pubkey: getPubkey() });
-```
-
-### Linux Keyring
-
-NOTE: This assumes you have secret-tool installed with a compatible keyring, such as GNOME keyring or KWallet. Various distributions might have different tools available.
-
-To add your mnemonic to the keychain:
-
-```sh
-"your 25 word mnemonic goes here" | secret-tool store --label "Algorand mnemonic (mainnet)" service algorand account mainnet-mnemonic
-```
-
-Then to load it programmatically:
-
-```ts
-function run(cmd: string, args: string[], input?: string): string {
-  return execFileSync(cmd, args, { encoding: "utf-8", input }).trim();
-}
-
-export function getLinuxMnemonic(name: string): string {
-  return run("secret-tool", ["lookup", "service", "algorand", "account", name]);
-}
-```
-
-And finally turn it into an Algorand address with all signing functions:
-
-```ts
-export const rawEd25519Signer: RawEd25519Signer = async (data: Uint8Array): Promise<Uint8Array> => {
-  const mnemonic = getLinuxMnemonic(MNEMONIC_NAME);
-  const seed = seedFromMnemonic(mnemonic);
-  const { rawEd25519Signer } = nobleEd25519Generator(seed);
-
-  const sig = await rawEd25519Signer(data);
-  seed.fill(0);
-
-  return sig;
-};
-
-export const getPubkey = (): Uint8Array => {
-  const mnemonic = getLinuxMnemonic(MNEMONIC_NAME);
-  const seed = seedFromMnemonic(mnemonic);
-  const { ed25519Pubkey } = nobleEd25519Generator(seed);
-  seed.fill(0);
-
-  return ed25519Pubkey;
-}
-
-const addrWithSigners = generateAddressWithSigners({ rawEd25519Signer, ed25519Pubkey: getPubkey() });
+// FIXME: No signer found when algorandAccount is sender without explicit signer
+// FIXME: Logs show Sending 0 µALGO from [object Object] to [object Object] via transaction UKEP7PS5G7YAX22ECEQZAOFGHKZZOAMJ3SMJ3VC3UYCJVTRQIN4A
+const pay = await AlgorandClient.defaultLocalNet().send.payment({
+  sender: algorandAccount,
+  signer: algorandAccount,
+  receiver: algorandAccount,
+  amount: microAlgo(0),
+})
 ```
 
 ## Secrets From CI
